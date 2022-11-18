@@ -1,0 +1,368 @@
+---
+title: "plant to music script"
+subtitle: last updated SZhang 8/20/2022
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+---
+
+# Introduction
+
+## pseudocode
+
+1. READ fileS into dataset
+
+   read the C2-C6 Hertz range list as a dataset called NOTEKEY
+   
+   read your data as a dataset called yourDATA
+   
+2. RENAME your data column of interest in yourDATA so you don't have to go type it in every where after
+
+3. check yourDATA to see if there's missing values, it's suitable, or if it needs to be transformed using IF statements, e.g. :
+
+IF
+
+    min value of yourDATA < hertz for C2
+    
+    PRINT "your smallest data value may be too small"
+    
+ELSE
+
+    PRINT "your smallest value should be fine"
+    
+etc etc. In yourDATA need to check for:
+
+  A. min & max of y value
+  
+  B. range of y value
+  
+  C. stdev of y value [<<optional]
+  
+4. Turn y value of yourDATA to notes
+
+INITIALIZE i for the NOTEKEY counting, set i = 1
+
+INITIALIZE j for yourDATA counting, set j = 1
+
+INITIALIZE count for the number of y values in yourDATA
+
+CREATE new column 'newnote' for converted notes then
+
+start loop #1
+
+  WHILE j <= count
+  
+start loop #2 inside loop #1
+
+    WHILE hertz at row i < convert y-value of yourDATA at row j
+    
+      ADD 1 to i
+      
+    OTHERWISE
+    
+      IF converted y-value of yourDATA at j == 0
+      
+        SET newnote in row j of yourDATA = NA
+        
+        RESET i to 1
+        
+        ADD 1 to j
+        
+        EXIT if-else
+        
+      ELSE 
+      
+        SET value of newnote in row j of yourDATA 
+        
+        = musical note value of row i-1 in NOTEKEY
+        
+        RESET i to 1
+        
+        ADD 1 to j
+        
+        EXIT if-else
+        
+    EXIT loop #2
+    
+  OTHERWISE EXIT loop #1
+  
+  
+5. PRINT newnote column to see if it all looks okay
+
+6. EXPORT as new .csv file for use in music apps
+
+## data requirements
+
+Your data should be in column format (like the usual case in R). It should be in .csv format and should contain at least 1 column of numerical data with a header. The header is the name of that column. E.g.
+
+|rootLength|
+|----------|
+|10.2      |
+|12.5      |
+|9.7       |
+|11.1      |
+
+## additional notes
+
+Your data file and the notekey.csv file should be saved in the same folder that you save this .Rmd file in.
+    
+# loading data
+
+## setting NOTEKEY
+```{r}
+#DO NO CHANGE ANYTHING IN THIS CHUNK
+
+NOTEKEY <- read.csv('NOTEKEY.csv')
+NOTEKEY$octave <- as.character(NOTEKEY$octave)
+
+#summary(NOTEKEY) #used to check loading, ignore this line
+# str(NOTEKEY$note_octave) #used to check loading, ignore this line
+
+#get the hertz value for middle c to use to check again your data range later
+note_split<-split(NOTEKEY, NOTEKEY$octave)
+middleC <- note_split$'4'
+
+```
+
+## load TESTDATA
+
+### this is start of the part that you can edit
+
+```{r}
+#CHANGE STUFF HERE
+
+#instead of exampleData.csv put name of your .csv
+#make sure your .csv is located in the same folder where you save this .Rmd!
+#blank cells WILL give you errors
+yourDATA <- read.csv('kernel.csv') 
+
+#instead of 'perimeter' put the name of your column
+colnames(yourDATA)[which(names(yourDATA) == 'height')] <- 'colOfInterest'
+
+#check to see if it all read correctly
+summary(yourDATA)
+```
+# start data processing
+
+## data check
+
+### set values
+```{r}
+#DO NOT CHANGE ANYTHING IN THIS CHUNK
+
+#hertz range we have to work with
+notekey_min = min(NOTEKEY$frequency)
+notekey_max = max(NOTEKEY$frequency)
+note_stdev = sd(middleC$frequency)
+
+#the number of datapoints in yourDATA
+data_count = length(yourDATA$colOfInterest)
+
+```
+
+
+### check to see if you've missing data
+```{r}
+#DO NOT CHANGE ANYTHING IN THIS CHUNK
+
+#counter
+k = 1
+
+#check to see if you've an NA
+while(k <= data_count){
+  
+ if (is.na(yourDATA$colOfInterest[k]) == FALSE){
+   k = k +1
+ } else {
+   print("You have a missing value in your dependent variable column, consider deleting that row of data.")
+   k = data_count + 1
+ }
+  
+}
+
+```
+If you received a missing value error message here, go back and delete the row with the missing value, save your .csv file and then go re-read in your data again. No message means you're fine and can move on to the next chunk.
+
+### check to see if your data needs to be transformed
+```{r}
+#check to see if your data needs to be transformed
+#DO NOT CHANGE STUFF IN THIS CHUNK
+
+#your initial data range
+your_min = min(yourDATA$colOfInterest) 
+your_max = max(yourDATA$colOfInterest) 
+your_stdev = sd(yourDATA$colOfInterest)
+
+#this bit is for if your data includes 0 as part of the value
+#counter 
+l = 1
+
+
+#sort your data column from smallest to largest by
+# 1) initialize new column "colSorted"
+yourDATA$colSorted = yourDATA$colOfInterest
+# 2) sort data from smallest to largest
+yourDATA$colSorted = sort(yourDATA$colSorted)
+
+while(l <= data_count){
+  
+ if (yourDATA$colSorted[l] == 0){
+   l = l +1
+ } else {
+   your_min = yourDATA$colSorted[l]
+   #print(your_min) #this part is for troubleshooting the loop; ignore
+   l = data_count + 1
+ }
+  
+}
+
+print('The acceptable numerical range for conversion music is:')
+print(summary(NOTEKEY$frequency))
+
+print('Your current data summary is:')
+print(summary(yourDATA$colOfInterest))
+
+if (your_min < notekey_min) {
+  print ("Your lowest value is too small, its converted frequency will be too low.")
+} else if (your_max > notekey_max){
+  print ("Your highest value is too big, its converted frequency will be too high.")
+}  else {
+    print ("The min and max value of your data should be fine.")
+  }
+    
+note_range = notekey_max - notekey_min
+your_range = your_max - your_min
+
+if (your_range > note_range){
+  print("The range of your data is too wide for this program.")
+} else {
+  print("The range of your data should be fine.")
+}
+ 
+if (your_stdev < note_stdev){
+  print("OPTIONAL: the variation in your data is a little on the small side.")
+} else {
+  print ("The variation in your data should be fine.")
+}
+
+```
+
+
+**If your minimum value is too small**
+Consider multiplying a constant value to all data in your column. You want the minimum to be over 66 Hertz. In R you can just type '+ 5'to add 5 to a number. 
+
+**If your maximum value is too big**
+Consider dividing a constant value from all data in your column. You want the maximum value to be under 1975 Hertz. In R you can just type '-5' to minus 5 from a number. 
+
+**why multiply and divide**
+Multiplication and division is recommended over adding and subtraction in case the data set contains 0 as part of the true values.
+
+**If the range of your data is too wide**
+You can either take the square root of all data in your column or divide all data by a constant value, or taking their log. In R you can do square root using 'sqrt()' (you use these functions with the parentheses the same way you would use the average() function in Excel). Divide is just '/', log is 'log()'. (You can also do 'log(x, base = y)', where x is what you want to take log of and y is your base number. In otherwords, if you don't give the base and just type 'log()' the default base is 10.)
+
+**OPTIONAL: If the variation in your data is too small**
+There are many ways you can deal with this. You can try subtracting your minimum value from all data, then adding in 0.01*minimum value (to ensure you don't get zeros), then multiply everything by a constant value (to make everything in range -- your are effectively magnifying the variation in your data this way). This part is up to personal taste to be honest.
+
+## how to transform your data (if you need to)
+```{r}
+#CHANGE THINGS HERE IF YOUR DATA NEEDS TO BE TRANSFORMED
+
+#DIRECTIONS
+
+#1. remove '#' from the front of the transformation you want (line 140-144)
+#2. change the value to be added, subtracted, etc to whatever you want
+#note adding 
+
+
+#transformed_add = yourDATA$colOfInterest + 20
+transformed_multiply = yourDATA$colOfInterest * 100
+#transformed_sqrt = sqrt(yourDATA$colOfInterest)
+#transformed_div = yourDATA$colOfInterest / 4
+#transformed_log = log(yourDATA$colOfInterest, base = 2)
+#biggerVariance = (yourDATA$colOfInterest-your_min+0.01*your_min)*12
+
+#3. remove '#' from the line of code below (line 286) and change the right side of <- to 'transformed_add'or transformed_div' or whatever you chose from above
+
+yourDATA$colOfInterest <- transformed_multiply
+
+
+#4. re-run the code for the "does your data need to be transformed" section in line 155
+#5. repeat steps 1-4 above until you're told your data's all ok. 
+
+#Each time you repeat steps 1-4 remember to:
+#A. put '#' back in front of the line of code you used the last time  
+#B. delete the '#' out of the line of code you're using this time
+#C. change the right side of the <- on line 291 to whichever transformation you're using this time!
+
+#NOTE: you can always reset all transformation by re-reading in your data from your .csv file
+
+```
+Do not proceed until the next part until you get the confirmation that your min and max values are okay.
+
+Remember that this step above is iterative! Meaning if the first time you run it you did multiply by 10, then you run it for a second time multiplying by 10, the value you're working with is the original value multiplied by 100!
+
+## turning your numbers to notes
+```{r}
+#DO NOT CHANGE ANYTHING IN THIS CHUNK
+
+#initializing new column for new notes
+newnote = yourDATA$colOfInterest
+
+
+#initializing, cont: add new column to data set
+yourDATA$newnote <- newnote
+
+#integer for NOTEKEY
+i = 1
+# integer for yourDATA
+j = 1
+
+#loop through all the numbers in yourDATA
+while(j <= data_count){
+  
+   #loop through all frequencies in NOTEKEY
+ while (yourDATA$colOfInterest[j] > NOTEKEY$frequency[i]){
+   i = i +1
+ } 
+  
+  if (yourDATA$newnote[j] == 0){
+    yourDATA$newnote[j] = NA
+    j = j + 1
+    i = 1
+  } else{
+  
+  yourDATA$newnote[j] = NOTEKEY$note_octave[i-1]
+  j= j + 1
+  i = 1
+ }
+    
+}
+
+```
+
+## output to .csv
+```{r}
+#DO NOT CHANGE ANYTHING IN THIS CHUNK
+
+#print your new notes to see if it all looks ok
+print(yourDATA$newnote)
+
+#export to csv
+# a new file will show up in this folder called 'yournotes.csv' 
+write.csv(yourDATA, "yournotes.csv", row.names = FALSE)
+```
+
+## final notes [pun by accident]
+ 
+You can copy your new column of music notes into many of the free apps available either for your smartphone, computer, or through a browser. Or, if you're inclined, try to play it on your musical instrument of choice. 
+
+For smartphone Bandlab is available for both android and iOS smartphones, 
+
+Typatone is through the web but also available as phone app. Note: it reads the letter, the symbol (#) and the number separately (and can sound very cute, but also limits its range).
+
+NOTE: In the yournotes.csv file, getting NA in the newnote column means that that beat should be silent. (This corresponds to a value of 0 in your dependent variable.)
